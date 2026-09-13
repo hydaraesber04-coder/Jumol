@@ -1,0 +1,45 @@
+name: Build Android APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Cordova
+      run: npm install -g cordova
+
+    - name: Create Cordova Project
+      run: |
+        cordova create myApp com.example.app MyTargetApp
+        rm -rf myApp/www/*
+        
+        # فك ضغط ملف site.zip تلقائياً ونقل المحتويات
+        unzip site.zip -d myApp/www/
+        
+        # إذا كان الـ zip يحتوي على مجلد داخلي، نقوم بنقل الملفات للمجلد الرئيسي
+        if [ -d "myApp/www/site" ]; then
+          mv myApp/www/site/* myApp/www/
+        fi
+        
+        # إصلاح إعدادات الأمان وقراءة الملفات محلياً
+        sed -i '/<\/widget>/i \    <preference name="AndroidInsecureFileModeEnabled" value="true" />' myApp/config.xml
+        sed -i '/<\/widget>/i \    <preference name="KeepRunning" value="true" />' myApp/config.xml
+        sed -i '/<\/widget>/i \    <allow-navigation href="http://*/*" />' myApp/config.xml
+        sed -i '/<\/widget>/i \    <allow-navigation href="https://*/*" />' myApp/config.xml
+        sed -i '/<\/widget>/i \    <allow-navigation href="file://*/*" />' myApp/config.xml
+        
+        cd myApp
+        cordova platform add android
+        cordova build android --no-telemetry
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release
+        path: myApp/platforms/android/app/build/outputs/apk/debug/app-debug.apk
