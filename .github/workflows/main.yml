@@ -22,7 +22,7 @@ jobs:
     - name: Install Cordova
       run: npm install -g cordova
 
-    # بناء ملفات التطبيق تلقائياً إذا وجد كود المشروع
+    # بناء المشروع تلقائياً في حال وجود كود المصدر
     - name: Build Web App
       run: |
         if [ -f "package.json" ]; then
@@ -30,7 +30,7 @@ jobs:
           npm run build
         fi
 
-    # إنشاء تطبيق كوردوفا ونقل الملفات وضبط إعدادات الأمان
+    # إنشاء تطبيق كوردوفا وضبط الإعدادات القياسية المعتمدة
     - name: Create Cordova Project & Configure
       run: |
         cordova create myApp com.jummal.app "حساب الجمل"
@@ -40,33 +40,34 @@ jobs:
         if [ -f "dist/index.html" ]; then
           echo "Using built files from dist/"
           cp -r dist/* myApp/www/
-        # 2. إذا كان هناك ملف site.zip يتم استخراجه بذكاء
+        # 2. إذا كان هناك ملف site.zip يتم استخراجه
         elif [ -f "site.zip" ]; then
           echo "Extracting site.zip..."
           mkdir -p temp_extracted
           unzip -o site.zip -d temp_extracted/
           INDEX_DIR=$(dirname $(find temp_extracted -name "index.html" | head -n 1))
           if [ -n "$INDEX_DIR" ]; then
-            echo "Found index.html in $INDEX_DIR, copying to www/"
             cp -r $INDEX_DIR/* myApp/www/
           fi
           rm -rf temp_extracted
         fi
 
-        # التحقق من وجود index.html لضمان سلامة البناء
+        # التحقق من وجود index.html
         if [ ! -f "myApp/www/index.html" ]; then
-          echo "ERROR: index.html was not found in myApp/www/!"
+          echo "ERROR: index.html was not found!"
           exit 1
         fi
 
-        # تطبيق إعدادات Cordova لحل مشاكل الشاشة البيضاء ودعم أندرويد
-        if [ -f "config.xml" ]; then
+        # استخدام ملف config.xml القياسي المرفق أو تطبيقه تلقائياً
+        if [ -f "myApp/www/config.xml" ]; then
+          cp myApp/www/config.xml myApp/config.xml
+        elif [ -f "config.xml" ]; then
           cp config.xml myApp/config.xml
         else
           sed -i '/<\/widget>/i \    <preference name="scheme" value="https" />' myApp/config.xml
           sed -i '/<\/widget>/i \    <preference name="hostname" value="localhost" />' myApp/config.xml
-          sed -i '/<\/widget>/i \    <preference name="AndroidInsecureFileModeEnabled" value="true" />' myApp/config.xml
           sed -i '/<\/widget>/i \    <preference name="KeepRunning" value="true" />' myApp/config.xml
+          sed -i '/<\/widget>/i \    <allow-navigation href="https://localhost/*" />' myApp/config.xml
           sed -i '/<\/widget>/i \    <allow-navigation href="*" />' myApp/config.xml
         fi
 
@@ -74,7 +75,7 @@ jobs:
         cordova platform add android
         cordova build android --no-telemetry
 
-    # رفع ملف الـ APK الناتج لتحميله
+    # حفظ ملف الـ APK الناتج
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
